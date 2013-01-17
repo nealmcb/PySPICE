@@ -1147,7 +1147,6 @@ def main(cspice_toolkit):
     global cspice_src
 
     parsing_prototype = False
-    curr_prototype = ''
     module_methods = StringIO()
     buffer = StringIO()
 
@@ -1178,64 +1177,49 @@ def main(cspice_toolkit):
             break
         input = input.strip()
 
+        ### Ignore blank lines
         if input == "":
             continue
 
         ### Look for typedef ... SpiceInt;
+        ### - If found, save the type and format string, and continue
         elif rgx.match(input):
             global spiceintType
             global spiceintType1
             spiceintType = input.split()[1]
             spiceintType1 = spiceintType[0]
-
-        # if parsing still false and line does not have opening bracket
-        elif not parsing_prototype and "(" not in input:
             continue
 
-        ### Append to current prototype
-        if parsing_prototype:
+        ### If already parsing a prototype, append to current prototype
+        elif parsing_prototype:
             # #debug("parse_adding: %s" % input)
 
             curr_prototype += input
 
             # #debug("curr_prototype now: %s" % curr_prototype)
 
-            # if the last character is a semi-colon, the prototype is
-            # complete, pass it along to the wrapper generator and clear
-            # out the curr_prototype variable
-            if input.endswith(";"):
-                parsing_prototype = False
-
-                # gen_wrapper can return False, then don't count it as used
-                #debug('')
-                #debug('%s\n' % curr_prototype)
-                if gen_wrapper(curr_prototype, buffer):
-                    used_prototypes += 1
-                total_prototypes += 1
-
-                curr_prototype = ""
-            pass
-
-        ### Start new prototype
-        else:
+        ### If an opening parenthesis is found, and if first word is
+        ###   a type used for functions, then start a new prototype
+        elif "(" in input:
             first_word = input[0:input.index(" ")]
             # #debug('first_word: {0}'.format(first_word))
             if first_word in function_types:
                 # #debug("adding %s" % input)
 
-                curr_prototype += input
+                curr_prototype = input
+                parsing_prototype = True
 
                 # #debug("curr_prototype now: %s" % curr_prototype)
-            else:
-                continue
-            if input.endswith(";"):
-                # #debug("prototype to be wrapped: {0}".format(curr_prototype))
-                if gen_wrapper(curr_prototype, buffer):
-                    used_prototypes += 1
-                total_prototypes += 1
-                curr_prototype = ""
-            else:
-                parsing_prototype = True
+
+
+        # if the last character is a semi-colon, the prototype is
+        # complete, pass it along to the wrapper generator
+        if parsing_prototype and input.endswith(";"):
+            # #debug("prototype to be wrapped: {0}".format(curr_prototype))
+            if gen_wrapper(curr_prototype, buffer): used_prototypes += 1
+            total_prototypes += 1
+            parsing_prototype = False
+
 
     sys.stderr.write("prototypes used: %d, total: %d\n" % (used_prototypes, total_prototypes))
     # put together the methods array
