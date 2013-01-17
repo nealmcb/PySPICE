@@ -10,6 +10,7 @@
  * $Id$
  */
 #include "pyspice.h"
+#include "malloc.h"
 
 void make_buildvalue_tuple(char *buf, const char *type, const int count)
 {
@@ -38,6 +39,11 @@ static PyObject * get_double_list(double *array, const int count)
     }
 
     return list;
+}
+
+PyObject * get_py_boolean(SpiceBoolean* spicebool)
+{
+    return Py_BuildValue( "O", *spicebool ? Py_True : Py_False);
 }
 
 /**
@@ -105,9 +111,98 @@ PyObject * get_py_plane(SpicePlane *spice_obj)
 }
 
 
+static inline int gat( PyObject* pyo, char* attr, SpiceCellDataType* ptr) {
+PyObject* pySubo;
+    pySubo = PyObject_GetAttrString( pyo, attr );
+    if ( !pySubo ) return 0;
+    Py_DECREF( pySubo );
+    if ( PyInt_Check(pySubo) ) { *ptr = (SpiceCellDataType) PyInt_AsLong(pySubo); return 1; }
+    if ( PyLong_Check(pySubo) ) { *ptr = (SpiceCellDataType) PyLong_AsDouble(pySubo); return 1; }
+    return 0;
+}
+
+static inline int gai( PyObject* pyo, char* attr, SpiceInt* ptr) {
+PyObject* pySubo;
+    pySubo = PyObject_GetAttrString( pyo, attr );
+    if ( !pySubo ) return 0;
+    Py_DECREF( pySubo );
+    if ( PyFloat_Check(pySubo) ) { *ptr = (SpiceDouble) PyFloat_AsDouble(pySubo); return 1; }
+    if ( PyInt_Check(pySubo) ) { *ptr = (SpiceDouble) PyInt_AsLong(pySubo); return 1; }
+    if ( PyLong_Check(pySubo) ) { *ptr = (SpiceDouble) PyLong_AsDouble(pySubo); return 1; }
+    return 0;
+}
+
+static inline int gad( PyObject* pyo, char* attr, SpiceInt* ptr) {
+PyObject* pySubo;
+    pySubo = PyObject_GetAttrString( pyo, attr );
+    if ( !pySubo ) return 0;
+    Py_DECREF( pySubo );
+    if ( PyInt_Check(pySubo) ) { *ptr = (SpiceInt) PyInt_AsLong(pySubo); return 1; }
+    if ( PyLong_Check(pySubo) ) { *ptr = (SpiceInt) PyLong_AsLong(pySubo); return 1; }
+    if ( PyFloat_Check(pySubo) ) { *ptr = (SpiceInt) PyFloat_AsDouble(pySubo); return 1; }
+    return 0;
+}
+
+static inline int gab( PyObject* pyo, char* attr, SpiceBoolean* ptr) {
+PyObject* pySubo;
+    pySubo = PyObject_GetAttrString( pyo, attr );
+    if ( !pySubo ) return 0;
+    Py_DECREF( pySubo );
+    if ( pySubo == Py_True ) { *ptr = SPICETRUE; return 1; }
+    if ( pySubo == Py_False ) { *ptr = SPICEFALSE; return 1; }
+    return 0;
+}
+
+#define GAANY(FUNC,ATTR) if ( ! FUNC(py_obj, #ATTR, &placeholder.ATTR) ) return NULL
+#define GAT(ATTR) GAANY(gat,ATTR)
+#define GAI(ATTR) GAANY(gai,ATTR)
+#define GAD(ATTR) GAANY(gad,ATTR)
+#define GAB(ATTR) GAANY(gab,ATTR)
+
 SpiceCell * get_spice_cell(PyObject *py_obj)
 {
     SpiceCell *spice_obj = NULL;
+
+    SpiceCell placeholder;
+    int baseLen;
+    int dataLen;
+    int itemLen;
+
+    PyObject* pyBase = PyObject_GetAttrString( py_obj, "base");
+    PyObject* pyData = PyObject_GetAttrString( py_obj, "data");
+
+#   define ANYCLEANUP(F) F(pyBase); F(pyData)
+#   define XCLEANUP ANYCLEANUP(Py_XDECREF)
+#   define CLEANUP ANYCLEANUP(Py_DECREF)
+#   define RTNNULL { XCLEANUP; return NULL; }
+
+    if ( !pyBase || !pyData) RTNNULL
+
+    if ( (baseLen=PyObject_Length(pyBase)) != SPICE_CELL_CTRLSZ) RTNNULL
+
+    GAI(size);
+
+    if ( (dataLen=PyObject_Length(pyData)) != placeholder.size) RTNNULL
+
+    GAT(dtype); GAI(length); GAI(card);
+    GAB(isSet); GAB(adjust); GAB(init);
+
+    switch (placeholder.dtype) {
+    case SPICE_CHR: itemLen = placeholder.length * sizeof(SpiceChar); break;
+    case SPICE_INT: itemLen = sizeof(SpiceInt); break;
+    case SPICE_DP: itemLen = sizeof(SpiceDouble); break;
+    case SPICE_TIME: itemLen = sizeof(SpiceDouble); break;
+    case SPICE_BOOL: itemLen = sizeof(SpiceBoolean); break;
+    default: RTNNULL;
+    }
+    
+    spice_obj = (SpiceCell*) malloc( sizeof( SpiceCell ) + ((SPICE_CELL_CTRLSZ + placeholder.size) * itemLen) );
+
+    placeholder.base = (void*) (spice_obj+1);
+    placeholder.data = placeholder.base + (SPICE_CELL_CTRLSZ * itemLen);
+
+    *spice_obj = placeholder;
+
     return spice_obj;
 }
 

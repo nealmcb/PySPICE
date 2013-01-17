@@ -59,6 +59,7 @@ free(spice_msg);                                                        \
   }
 
 /* Functions defined in the implementation file */
+PyObject * get_py_boolean(SpiceBoolean* spicebool);
 PyObject * get_py_ellipse(SpiceEllipse *spice_obj);
 PyObject * get_py_cell(SpiceCell *cell);
 PyObject * get_py_ekattdsc(SpiceEKAttDsc *spice_obj);
