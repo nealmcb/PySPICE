@@ -14,7 +14,11 @@
 # $Id$
 
 import os, sys
+import traceback
 from cStringIO import StringIO
+
+spiceintType = 'BAD'
+spiceintType1 = 'B'
 
 # This is a parameter class that is used to hold all the information about a
 # parameter.  Initially there is nothing in it.  The object is populated with
@@ -85,10 +89,14 @@ exclude_list = (
 module_defs = []
 cspice_src = None
 
-DEBUG = 0 # set it on when string is the right one
+DEBUG = 'DEBUG_MKWRAPPER' in os.environ # set it on when string is the right one
 
 INPUT_TYPE = 0
 OUTPUT_TYPE = 1
+INOUTPUT_TYPE = 2
+
+IOTYPE = { 'I':INPUT_TYPE, 'O':OUTPUT_TYPE, 'I/O': INOUTPUT_TYPE, 'I-O': INOUTPUT_TYPE, 'I,O': INOUTPUT_TYPE }
+IOTYPEkeys = IOTYPE.keys()
 
 def debug(string):
     if DEBUG: sys.stderr.write("%s\n" % str(string))
@@ -110,10 +118,12 @@ def determine_py_type(param_obj):
     elif type in ('ConstSpiceDouble', 'SpiceDouble'):
         param_obj.py_string = 'd'
     elif type in ('ConstSpiceBoolean', 'SpiceBoolean'):
-        param_obj.py_string = 'i'
+        param_obj.py_string = 'O'
+        param_obj.get_py_fn = 'get_py_boolean'
     elif type in ('ConstSpiceInt', 'SpiceInt'):
         # put a long for a spice int since they are long integers
-        param_obj.py_string = 'l'
+        global spiceintType1
+        param_obj.py_string = spiceintType1
     elif type == 'SpiceCell':
         param_obj.py_string = 'O'
         param_obj.spice_obj = 'Cell'
@@ -139,6 +149,9 @@ def determine_py_type(param_obj):
         param_obj.spice_obj = 'Plane'
         param_obj.get_py_fn = 'get_py_plane'
         param_obj.get_spice_fn = 'get_spice_plane'
+    elif type in ('int'):
+        param_obj.py_string = 'i'
+        sys.stderr.write('Warning: suspect type: %s for %s\n' % (type,param_obj.name,))
     elif type in ('void'):
         param_obj.py_string = ''
     else:
@@ -155,7 +168,10 @@ def get_doc(function_name):
         '-Detailed_Output',
     ]
 
-    src_file = "%s/%s.c" % (cspice_src, function_name)
+    if function_name[-1:]=='_':
+      src_file = "%s/%s.c" % (cspice_src, function_name[:-1])
+    else:
+      src_file = "%s/%s.c" % (cspice_src, function_name)
 
     if os.path.exists(src_file):
         f = open(src_file, 'r')
@@ -218,8 +234,131 @@ def gen_wrapper(prototype, buffer):
     # returns a container object with all the information parsed up.
     prototype_obj = parse_prototype(prototype)
 
+    ### Save function name to shorter local variable
+    funcnm = prototype_obj.function_name
+
+    ### Do not make interfaces for 
+    ### - FORTRAN-replacement f2c routines, named *_
+    ### - CSPICE private routines, named zz*
+    if funcnm[-1:]=='_': return False
+    if funcnm[:2]=='zz': return False
+
     # check the exclude list before continuing
-    if prototype_obj.function_name in exclude_list: return False
+    if funcnm in exclude_list: return False
+
+    # dig out the document string from the source file
+    doc = get_doc(funcnm)
+
+    ### From doc string, get I, I/O or O for each argument
+    ### from text between lines containing -Brief_I/O and
+    ### -Detailed_Input
+
+    ### E.g. with the following sample text, populate the
+    ###      dictionary as follows:
+
+    ###        ioDict = dict(keywd='I', string='I/O', substr='O')
+
+    ###...
+    ###-Brief_I/O
+    ###
+    ###   VARIABLE  I/O  DESCRIPTION 
+    ###   --------  ---  -------------------------------------------------- 
+    ###   center, 
+    ###   vec1, 
+    ###   vec2       I   Center and two generating vectors for an ellipse. 
+    ###   v1, v2     I   Input vectors.
+    ###   keywd      I   Word that marks the beginning of text of interest. 
+    ###   string    I/O  String containing a sequence of words, and
+    ###                  this is a line that starts with more than 10 spaces
+    ###   substr     O   String from end of keywd to beginning of first 
+    ###
+    ###   The function returns ...
+    ###
+    ###-Detailed_Input
+    ###...
+
+    ioDict = Container()
+    ioDict.defArgSequence = []
+
+    sentinelStart = '-Brief_I/O'
+    sentinelEnd = '-Detailed_Input'
+    sentinels = [ sentinelStart, sentinelEnd ]
+    toks = doc.split('\\n') ### + sentinels
+    toks.reverse()
+
+    try:
+
+      for sentinel in sentinels:
+
+        bridesmaids = []
+
+        for lin in iter( lambda: toks.pop().rstrip(' \r	'), sentinel ):
+
+          ### Skip if
+
+          ### - this is not between the Start and End sentinels
+          if sentinel!=sentinelEnd: continue
+
+          ### - line starts with 10 spaces
+          if not lin[:10].split():
+            bridesmaids = []
+            continue
+
+          ### - line has fewer than three tokens
+          lintoks = lin.split()
+          if len(lintoks)<3:
+
+            ### For single-token lines, if token ends with a continuation comma,
+            ### then add it to bridesmaids for addition to ioDict with next
+            ### line that has I, O or I/O defined
+            if len(lintoks)==1 and lintoks[0][-1:]==',':
+                bridesmaids += [ lintoks[0][:-1].lower() ]
+
+            continue
+
+          argnames, io = lintoks[:2]
+
+          toks2 = argnames.split(',')
+          while len(toks2)>1: bridesmaids += [ toks2.pop(0) ]
+          argname = toks2[0]
+            
+          ### - argname is empty (should not be possible)
+          if len(argname)<1:
+              bridesmaids = []
+              continue
+
+          if not ( io.upper() in IOTYPEkeys ):
+              bridesmaids = []
+              continue
+
+          argname = argname.lower()
+          io = io.upper()
+
+          ### - argname has uppercase in it
+          if argname != lintoks[0]:
+            if argname=='variable': continue
+            fmt = "### %%s case argument:  %s? [%s]" % (lintoks[0], str(dict(func=funcnm,lin=lin,sentinel=sentinel)),)
+            if argname.upper() != lintoks[0]:
+              pass ##print( fmt % "Mixed" )
+            else:
+              pass ##print( fmt % "Upper" )
+
+          ### If second token (toks[1] == io) is I, I/O or O,
+          ### then add it to IO dictionary, after bridesmaids
+
+          bridesmaids.append( argname )
+          ###print( (bridesmaids,argname,) )
+          ioDict.defArgSequence += bridesmaids
+          while bridesmaids: ioDict[bridesmaids.pop(0)] = io
+          ###print( (bridesmaids,ioDict,) )
+
+      ioDict.ioDictStatus = 'success'
+
+    ### Protect against absence of a sentinel when
+    except:
+      ioDict['__STATUS__'] = 'failure'
+      traceback.print_exc()
+      pass
 
     # the string that is passed to PyArg_ParseTuple for getting the
     # arguments list and Py_BuildValue for returning results
@@ -227,7 +366,7 @@ def gen_wrapper(prototype, buffer):
     buildvalue_string = ""
 
     # remove the _c suffix for the python function name
-    python_function_name = prototype_obj.function_name.rsplit('_c',1)[0]
+    python_function_name = funcnm.rsplit('_c',1)[0]
 
     # Add the C function prototype to the source code output.
     t = '/* %s */' % prototype
@@ -242,33 +381,67 @@ def gen_wrapper(prototype, buffer):
     if t:
         prototype_comment_list.append(t)
 
-    prototype_comment = '\n'.join(prototype_comment_list)
+    ### Indent comments after the first to make them slightly easier to read
+    pfx = '\n' + ( ' '*(5 + len(prototype.split('(')[0])) )
+
+    prototype_comment = pfx.join(prototype_comment_list)
 
     # declare the function for this wrapper
     buffer.write(
         "\n%s\nstatic PyObject * spice_%s(PyObject *self, PyObject *args)\n{" % \
         (prototype_comment, python_function_name));
 
+
+    buffer.write( "\n  /* %s */\n" % ( str(ioDict),) )
+
     # split up the inputs from the outputs so that only inputs have to
     # be provided to the function from python and the outputs are
     # returned to python, e.g. et = utc2et("SOME DATE")
-    last_item = None
-    t_type = None
+    ###last_item = None
+    ###t_type = None
+    t_type = INPUT_TYPE
     for param in prototype_obj.params:
         #debug('')
+
+        if param == 'void':
+            if len(prototype_obj.params)>1:
+                sys.stderr.write('Warning:  void argument in list of more than one argument from %s()\n' % (funcnm,) )
+            continue
+
         param_info = parse_param(param)
         if param_info is None:
+            sys.stderr.write( "### Could not parse_param %d:  '%s'\n" % ( ordinal, str(param), ) )
             continue
-        #debug("parsed param: %s" % param_info)
+        #debug("parsed %s() param: %s" % (funcnm,param_info,) )
 
-        if param_info.is_array and not param_info.is_const:
-            t_type = OUTPUT_TYPE
-        elif param_info.is_const or not param_info.is_pointer:
-            t_type = INPUT_TYPE
-        elif param_info.is_pointer:
-            t_type = OUTPUT_TYPE
+        if True:
+            try:
+
+                ### Handle nconsistencies in argument names between declarations
+                ### in CSPICE headers and in CSPICE functions in *_c.c
+
+                ioDictArgName = ioDict.defArgSequence.pop(0)
+
+                if not (param_info.name in ioDict):
+                   ioDict[param_info.name] = ioDict[ioDictArgName]
+
+                buffer.write( '\n  /* %s() using param_type ioDict["%s"]=%s for %s */' % ( funcnm, ioDictArgName, ioDict[ioDictArgName], param_info.name, ) )
+
+                t_type = IOTYPE[ioDict[param_info.name]]
+
+            except:
+                traceback.print_exc()
+                print( dict(func=funcnm,ioDict=ioDict,param=param) )
+                raise Exception("I don't know if %s is an input or output" % param)
         else:
-            raise Exception("I don't know if %s is an input or output" % param)
+            if param_info.is_array and not param_info.is_const:
+                t_type = OUTPUT_TYPE
+            elif param_info.is_const or not param_info.is_pointer:
+                t_type = INPUT_TYPE
+            elif param_info.is_pointer:
+                t_type = OUTPUT_TYPE
+            else:
+                raise Exception("I don't know if %s is an input or output" % param)
 
         # tack the parameter type onto the param_info tuple
         param_info.param_type = t_type
@@ -280,17 +453,18 @@ def gen_wrapper(prototype, buffer):
         # TODO: This is a HUGE hack and would be nice to find an alternate
         # way of deciding this).
 
-        if last_item is not None and \
-                t_type == INPUT_TYPE and last_item.param_type == OUTPUT_TYPE:
-            output_list.remove(last_item)
-            input_list.append(last_item)
+        ###if last_item is not None and \
+        ###        t_type == INPUT_TYPE and last_item.param_type == OUTPUT_TYPE:
+        ###    output_list.remove(last_item)
+        ###    input_list.append(last_item)
 
-        if t_type == INPUT_TYPE:
+        if t_type == INPUT_TYPE or t_type == INOUTPUT_TYPE:
             input_list.append(param_info)
-        else:
+
+        if t_type == OUTPUT_TYPE or t_type == INOUTPUT_TYPE:
             output_list.append(param_info)
 
-        last_item = param_info
+        ###last_item = param_info
         #debug("param after hack: %s" % param_info)
 
     #debug("")
@@ -307,7 +481,7 @@ def gen_wrapper(prototype, buffer):
     #
     # the allocate_memory variable points to the last input variable, which
     # should be the variable pointing to the max number of items in the array
-    if prototype_obj.function_name.startswith('bodv'):
+    if funcnm.startswith('bodv'):
         output_list[-1].make_pointer = True
         output_list[-1].allocate_memory = input_list[-1].name
         manually_build_returnVal = True
@@ -318,6 +492,9 @@ def gen_wrapper(prototype, buffer):
 
         # declare the variable
         buffer.write("\n  %s" % output.type)
+
+        if output.type=='SpiceCell':
+            output.make_pointer = True
 
         if output.make_pointer:
             buffer.write(" *")
@@ -359,6 +536,7 @@ def gen_wrapper(prototype, buffer):
             buffer.write("\n  %s %s = STRING_LEN;" % \
                          (input.reg_type, input_name)
             )
+
         else:
             parse_tuple_string += input.py_string
 
@@ -367,14 +545,16 @@ def gen_wrapper(prototype, buffer):
             else:
                 pointer_string = " "
 
-            buffer.write("\n  %s%s%s" % (
-                input.reg_type, pointer_string, input_name))
+            ### if this is both an input and an output, then do not declare it
+            if input.param_type == INPUT_TYPE:
+                buffer.write("\n  %s%s%s" % (
+                    input.reg_type, pointer_string, input_name))
 
-            if input.is_array:
-                for count in input.num_elements:
-                    buffer.write("[%s]" % count)
+                if input.is_array:
+                    for count in input.num_elements:
+                        buffer.write("[%s]" % count)
 
-            buffer.write(";")
+                buffer.write(";")
 
             # if this input has a get_spice_fn function associated with it,
             # declare a variable for the conversion
@@ -396,10 +576,14 @@ def gen_wrapper(prototype, buffer):
     buffer.write('\n\n  char failed = 0;')
 
     if not manually_build_returnVal and output_list:
-        buffer.write('\n  char buildvalue_string[STRING_LEN] = "";')
+        if len(output_list)!=1 or output_list[0].name!='found':
+          buffer.write('\n  char buildvalue_string[STRING_LEN] = "";')
+
+    if output_list and ( len(output_list) != 1 or output_list[0].name!='found' ):
+          buffer.write('\n  PyObject *returnVal;')
 
     # configure the input string list for parsing the args tuple
-    input_list_string = "&" + ", &".join(input_name_list)
+    input_list_string = "&" + ", &".join( input_name_list )
 
     # if the function type is not void, declare a variable for the
     # result.
@@ -425,7 +609,7 @@ def gen_wrapper(prototype, buffer):
 
     # if there are any Python -> C conversions that need to occur, add them here.
     if py_to_c_conversions:
-        buffer.write('\n  %s\n' % '\n'.join(py_to_c_conversions))
+        buffer.write('\n  %s\n' % '\n  '.join(py_to_c_conversions))
 
     for output in output_list:
         # see if memory needs to be allocated for this variable
@@ -436,7 +620,10 @@ def gen_wrapper(prototype, buffer):
     # build the input name list for calling the C function
     input_name_list = []
     for input in input_list:
-        input_name_list.append(input.name)
+
+        ### if this is both an input and an output, then do not declare it
+        if input.param_type == INPUT_TYPE:
+            input_name_list.append(input.name)
 
     # combine the input name list and the output name list for the C
     # function call
@@ -450,6 +637,7 @@ def gen_wrapper(prototype, buffer):
     for output in output_list:
         if any([output.is_array,
                 output.type == "SpiceChar",
+                output.make_pointer,
                 output.allocate_memory]):
             t_list.append(output.name)
         else:
@@ -473,9 +661,9 @@ def gen_wrapper(prototype, buffer):
 
     # Call the C function
     if prototype_obj.type != "void":
-        buffer.write("\n  result = %s(%s);" % (prototype_obj.function_name, param_list_string))
+        buffer.write("\n  result = %s(%s);" % (funcnm, param_list_string))
     else:
-        buffer.write("\n  %s(%s);" % (prototype_obj.function_name, param_list_string))
+        buffer.write("\n  %s(%s);" % (funcnm, param_list_string))
 
     # run the macro to check to see if an exception was raised.  once the
     # check is made, see if the failed boolean was set.  this is an indication
@@ -532,9 +720,6 @@ def gen_wrapper(prototype, buffer):
         pass # for now; TODO: figure out what to do
 
     buffer.write("\n}");
-
-    # dig out the function name from the source file
-    doc = get_doc(prototype_obj.function_name)
 
     if not doc:
         buffer.write('\nPyDoc_STRVAR(%s_doc, "");\n' % python_function_name)
@@ -596,6 +781,8 @@ def make_automatic_returnVal(buffer, output_list):
                 )
             else:
                 check_found = True
+
+            # Do not add found to the t_list and output_list_string vars
             continue
 
         # If the output is an array, expand out all the elements in order
@@ -604,7 +791,10 @@ def make_automatic_returnVal(buffer, output_list):
         if output.is_array:
             t_list += get_array_sizes(output.num_elements, output.name)
         elif(output.get_py_fn):
-            t_list.append('%s(&%s)' % (output.get_py_fn, output.name))
+            if(output.type=='SpiceCell'):
+                t_list.append('%s(%s)' % (output.get_py_fn, output.name))
+            else:
+                t_list.append('%s(&%s)' % (output.get_py_fn, output.name))
         else:
             t_list.append(output.name)
 
@@ -620,7 +810,7 @@ def make_automatic_returnVal(buffer, output_list):
             buffer.write('\n  ')
 
         buffer.write(
-            'PyObject *returnVal = Py_BuildValue(buildvalue_string, %s);' % \
+            'returnVal = Py_BuildValue(buildvalue_string, %s);' % \
             (output_list_string))
 
         for output in output_list:
@@ -640,10 +830,10 @@ def make_manual_returnVal(buffer, output_list):
     this function can be used.
     """
 
-    buffer.write('\n  int i = 0;')
+    buffer.write('\n  {\n  int i = 0;')
     buffer.write('\n  PyObject *t = NULL;')
     buffer.write(
-        '\n  PyObject *returnVal = PyTuple_New(%d);' % len(output_list))
+        '\n  returnVal = PyTuple_New(%d);' % len(output_list))
 
     count = 0;
     for count in range(len(output_list)):
@@ -666,7 +856,7 @@ def make_manual_returnVal(buffer, output_list):
                 (count, output.py_string, output.name)
             )
 
-    buffer.write('\n  return returnVal;');
+    buffer.write('\n  }\n  return returnVal;');
 
 def get_type(type):
     reg_type = type
@@ -680,7 +870,8 @@ def get_type(type):
         reg_type = 'char'
     elif type in ('ConstSpiceInt', 'SpiceInt'):
         # put a long for a spice int since they are long integers
-        reg_type = 'long'
+        global spiceintType
+        reg_type = spiceintType
 
     return reg_type
 
@@ -972,6 +1163,8 @@ def main(cspice_toolkit):
     used_prototypes = 0
     total_prototypes = 0;
     line_no = 0
+    import re
+    rgx = re.compile( '^ *typedef [^ ]* SpiceInt; *$' )
     while 1:
         input = output.readline()
         line_no +=1
@@ -982,6 +1175,11 @@ def main(cspice_toolkit):
 
         if input == "":
             continue
+        elif rgx.match(input):
+            global spiceintType
+            global spiceintType1
+            spiceintType = input.split()[1]
+            spiceintType1 = spiceintType[0]
         # if parsing still false and line does not have opening bracket
         elif not parsing_prototype and "(" not in input:
             continue
