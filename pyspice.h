@@ -33,9 +33,9 @@ extern PyObject *SpiceException;
 /* Stuff for getting the short error message
 #define SPICE_MESSAGE_LEN 25
 char *spice_msg = NULL;                                                 \
-spice_msg = (char *)malloc(sizeof(char) * SPICE_MESSAGE_LEN);           \
+spice_msg = (char *)PyMem_Malloc(sizeof(char) * SPICE_MESSAGE_LEN);     \
 getmsg_c("short", SPICE_MESSAGE_LEN, spice_msg);                        \
-free(spice_msg);                                                        \
+PyMem_Free(spice_msg);                                                  \
 */
 
 #define PYSPICE_CHECK_FAILED {                                          \
@@ -44,7 +44,7 @@ free(spice_msg);                                                        \
                                                                         \
     /* check if the function call failed */                             \
     if(failed_c()) {                                                    \
-      spice_detail = (char *)malloc(sizeof(char) * SPICE_DETAIL_LEN);   \
+      spice_detail=(char *)PyMem_Malloc(sizeof(char)*SPICE_DETAIL_LEN); \
                                                                         \
       getmsg_c("long", SPICE_DETAIL_LEN, spice_detail);                 \
                                                                         \
@@ -52,7 +52,7 @@ free(spice_msg);                                                        \
                                                                         \
       PYSPICE_MAKE_EXCEPTION(spice_detail);                             \
                                                                         \
-      free(spice_detail);                                               \
+      PyMem_Free(spice_detail);                                         \
                                                                         \
       failed = 1;                                                       \
     }                                                                   \

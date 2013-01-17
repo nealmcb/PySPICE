@@ -10,7 +10,6 @@
  * $Id$
  */
 #include "pyspice.h"
-#include "malloc.h"
 
 void make_buildvalue_tuple(char *buf, const char *type, const int count)
 {
@@ -196,7 +195,7 @@ SpiceCell * get_spice_cell(PyObject *py_obj)
     default: RTNNULL;
     }
     
-    spice_obj = (SpiceCell*) malloc( sizeof( SpiceCell ) + ((SPICE_CELL_CTRLSZ + placeholder.size) * itemLen) );
+    spice_obj = (SpiceCell*) PyMem_Malloc( sizeof( SpiceCell ) + ((SPICE_CELL_CTRLSZ + placeholder.size) * itemLen) );
 
     placeholder.base = (void*) (spice_obj+1);
     placeholder.data = placeholder.base + (SPICE_CELL_CTRLSZ * itemLen);
@@ -220,7 +219,7 @@ SpiceEKSegSum * get_spice_eksegsum(PyObject *py_obj)
 
 SpicePlane * get_spice_plane(PyObject *py_obj)
 {
-    SpicePlane *spice_obj = malloc(sizeof(SpicePlane));
+    SpicePlane *spice_obj = PyMem_Malloc(sizeof(SpicePlane));
 
     PyObject *l = NULL, *f = NULL;
 
@@ -248,7 +247,7 @@ SpiceEllipse * get_spice_ellipse(PyObject *ellipse)
     char failed = 0, *sections[3] = {"center", "semi_major", "semi_minor"};
     int i, j;
 
-    SpiceEllipse *spice_ellipse = malloc(sizeof(SpiceEllipse));
+    SpiceEllipse *spice_ellipse = PyMem_Malloc(sizeof(SpiceEllipse));
 
     double *ellipse_sections[3] = {spice_ellipse->center, spice_ellipse->semiMajor, spice_ellipse->semiMinor};
 
@@ -266,7 +265,7 @@ SpiceEllipse * get_spice_ellipse(PyObject *ellipse)
     }
 
     if(failed) {
-        free(spice_ellipse);
+        PyMem_Free(spice_ellipse);
         spice_ellipse = NULL;
     }
 
@@ -303,7 +302,7 @@ PyObject * spice_berto(PyObject *self, PyObject *args)
 
     py_ellipse = get_py_ellipse(spice_ellipse);
 
-    free(spice_ellipse);
+    PyMem_Free(spice_ellipse);
 
     return py_ellipse;
 }
@@ -318,7 +317,7 @@ PyObject * spice_test(PyObject *self, PyObject *args)
     plane = get_spice_plane(py_obj);
 
     PyObject *py_obj2 = get_py_plane(plane);
-    free(plane);
+    PyMem_Free(plane);
 
     return py_obj2;
 }

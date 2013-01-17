@@ -414,6 +414,7 @@ def gen_wrapper(prototype, buffer):
             continue
         #debug("parsed %s() param: %s" % (funcnm,param_info,) )
 
+        ### New code (BTCarcich, 2012-01):
         if True:
             try:
 
@@ -433,6 +434,8 @@ def gen_wrapper(prototype, buffer):
                 traceback.print_exc()
                 print( dict(func=funcnm,ioDict=ioDict,param=param) )
                 raise Exception("I don't know if %s is an input or output" % param)
+
+        ### Disabled old code:
         else:
             if param_info.is_array and not param_info.is_const:
                 t_type = OUTPUT_TYPE
@@ -614,7 +617,7 @@ def gen_wrapper(prototype, buffer):
     for output in output_list:
         # see if memory needs to be allocated for this variable
         if output.allocate_memory:
-            buffer.write("\n\n  %s = malloc(sizeof(%s) * %s);" % \
+            buffer.write("\n\n  %s = PyMem_Malloc(sizeof(%s) * %s);" % \
                 (output.name, output.type, output.allocate_memory))
 
     # build the input name list for calling the C function
@@ -674,7 +677,7 @@ def gen_wrapper(prototype, buffer):
 
     for output in output_list:
         if output.allocate_memory:
-            buffer.write('\n    free(%s);' % output.name)
+            buffer.write('\n    PyMem_Free(%s);' % output.name)
 
     buffer.write('\n    return NULL;')
     buffer.write('\n  }\n')
@@ -730,7 +733,9 @@ def gen_wrapper(prototype, buffer):
     module_defs.append('{"%s", spice_%s, METH_VARARGS, %s_doc},' % \
                        (python_function_name, python_function_name, python_function_name))
 
-    return buffer.getvalue()
+    ### Callers only check for True or false; buffer argument is modified in place
+    ### Old:  return buffer.getvalue()
+    return True
 
 def get_array_sizes(list, name):
     """
@@ -815,7 +820,7 @@ def make_automatic_returnVal(buffer, output_list):
 
         for output in output_list:
             if output.allocate_memory:
-                buffer.write('\n  free(%s);' % output.name)
+                buffer.write('\n  PyMem_Free(%s);' % output.name)
 
         buffer.write('\n  return returnVal;');
 
@@ -1157,7 +1162,7 @@ def main(cspice_toolkit):
 
     # preprocess the header file
     output = StringIO()
-    run_command('gcc -E %s' % cspice_header, output)
+    run_command('gcc -E %s | tee spiceusr.i' % cspice_header, output)
     output.reset()
 
     used_prototypes = 0
@@ -1175,14 +1180,19 @@ def main(cspice_toolkit):
 
         if input == "":
             continue
+
+        ### Look for typedef ... SpiceInt;
         elif rgx.match(input):
             global spiceintType
             global spiceintType1
             spiceintType = input.split()[1]
             spiceintType1 = spiceintType[0]
+
         # if parsing still false and line does not have opening bracket
         elif not parsing_prototype and "(" not in input:
             continue
+
+        ### Append to current prototype
         if parsing_prototype:
             # #debug("parse_adding: %s" % input)
 
@@ -1205,6 +1215,8 @@ def main(cspice_toolkit):
 
                 curr_prototype = ""
             pass
+
+        ### Start new prototype
         else:
             first_word = input[0:input.index(" ")]
             # #debug('first_word: {0}'.format(first_word))
@@ -1218,7 +1230,9 @@ def main(cspice_toolkit):
                 continue
             if input.endswith(";"):
                 # #debug("prototype to be wrapped: {0}".format(curr_prototype))
-                gen_wrapper(curr_prototype, buffer)
+                if gen_wrapper(curr_prototype, buffer):
+                    used_prototypes += 1
+                total_prototypes += 1
                 curr_prototype = ""
             else:
                 parsing_prototype = True

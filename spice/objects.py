@@ -1,27 +1,49 @@
 # Released under the BSD license, see LICENSE for details
 
 class DataType(object):
+    """
+    SPICE_* and * quantities must match enumeration _SpiceDataType from
+      cspice/include/SpiceZdf.h
+    """
+    SPICE_CHR = 0
+    SPICE_DP = 1
+    SPICE_INT = 2
+    SPICE_TIME = 3
+    SPICE_BOOL = 4
+    CHR = 0
+    DP = 1
+    INT = 2
+    TIME = 3
+    BOOL = 4
     def __init__(self):
-        self.SPICE_CHR = 0
-        self.SPICE_DP = 1
-        self.SPICE_INT = 2
-        self.SPICE_TIME = 3
-        self.SPICE_BOOL = 4
+        pass
 
 
 class Cell(object):
-    CellDataType = DataType
-
-    def __init__(self, arg):
-        self.dtype = self.CellDataType()
-        self.length = 0
-        self.size = 0
+    baseSize = 6
+    minCharLen = 5
+    def __init__(self, dtArg, szArg, lenArg=minCharLen):
+        dtLcl = int(dtArg)
+        lenLcl = 0
+        if dtLcl==DataType.SPICE_CHR:
+            lenLcl = int(lenArg)
+            if lenLcl<Cell.minCharLen: lenLcl=Cell.minCharLen
+            v = ' ' * lenLcl
+        elif dtLcl==DataType.SPICE_DP: v = 0.0
+        elif dtLcl==DataType.SPICE_INT: v = 0
+        elif dtLcl==DataType.SPICE_TIME: v = 0.0
+        elif dtLcl==DataType.SPICE_BOOL: v = True
+        else: 
+            raise TypeError, 'Invalid type:  %s' % (str(dtArg),)
+        self.dtype = dtArg
+        self.length = lenLcl
+        self.size = szArg
         self.card = 0
         self.isSet = False
         self.adjust = False
         self.init = False
-        self.base = None # this is a void *; how to represent it?
-        self.data = None # this is a void *; how to represent it?
+        self.base = [v,]*Cell.baseSize
+        self.data = [v,]*szArg
 
 
 class Ellipse(object):
