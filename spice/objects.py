@@ -21,14 +21,14 @@ class DataType(object):
 
 class Cell(object):
     baseSize = 6
-    minCharLen = 5
+    minCharLen = 6
     def __init__(self, dtArg, szArg, lenArg=minCharLen):
         dtLcl = int(dtArg)
         lenLcl = 0
         if dtLcl==DataType.SPICE_CHR:
             lenLcl = int(lenArg)
             if lenLcl<Cell.minCharLen: lenLcl=Cell.minCharLen
-            v = ' ' * lenLcl
+            v = ' ' * (lenLcl-1)
         elif dtLcl==DataType.SPICE_DP: v = 0.0
         elif dtLcl==DataType.SPICE_INT: v = 0
         elif dtLcl==DataType.SPICE_TIME: v = 0.0

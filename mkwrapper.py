@@ -15,6 +15,7 @@
 
 import os, sys
 import traceback
+import pprint
 from cStringIO import StringIO
 
 spiceintType = 'BAD'
@@ -41,8 +42,6 @@ function_types = ('ConstSpiceChar', 'SpiceBoolean', 'SpiceChar', 'SpiceDouble', 
 RESERVED_NAMES = ('free',)
 
 # Reasons for excluding the following functions
-# appnd*, etc. - not looked into translating a SpiceCell to a python object yet.
-# axisar_c - haven't written code to parse arrays
 # bodvar_c - deprecated
 # bschoc_c, etc. - how to support const void * array
 # ckw05_c - how to support SpiceCK05Subtype
@@ -56,12 +55,10 @@ RESERVED_NAMES = ('free',)
 exclude_list = (
     'cnames',
 
-    'appndc_c', 'appndd_c', 'appndi_c', 'zzsynccl_c',
-
     'bodvar_c',
 
     'bschoc_c', 'bsrchc_c', 'dafac_c', 'dafec_c', 'dasac_c', 'ekacec_c',
-    'ekaclc_c', 'ekbseg_c', 'zzgetcml_c', 'ekifld_c', 'ekucec_c', 'esrchc_c',
+    'ekaclc_c', 'ekbseg_c', 'ekifld_c', 'ekucec_c', 'esrchc_c',
     'getelm_c', 'isrchc_c', 'kxtrct_c', 'lmpool_c', 'lstlec_c', 'lstltc_c',
     'mequg_c', 'mtxmg_c', 'mtxvg_c', 'mxmg_c', 'mtmtg_c', 'mxmtg_c', 'mxvg_c',
     'orderc_c', 'pcpool_c', 'swpool_c', 'vtmvg_c', 'xposeg_c',
@@ -121,7 +118,7 @@ def determine_py_type(param_obj):
         param_obj.py_string = 'O'
         param_obj.get_py_fn = 'get_py_boolean'
     elif type in ('ConstSpiceInt', 'SpiceInt'):
-        # put a long for a spice int since they are long integers
+        # Use an "l" or an "i" from the SpiceInt typedef
         global spiceintType1
         param_obj.py_string = spiceintType1
     elif type == 'SpiceCell':
@@ -363,6 +360,7 @@ def gen_wrapper(prototype, buffer):
     # the string that is passed to PyArg_ParseTuple for getting the
     # arguments list and Py_BuildValue for returning results
     parse_tuple_string = ""
+    extra_parse_tuple_string = ""
     buildvalue_string = ""
 
     # remove the _c suffix for the python function name
@@ -471,6 +469,7 @@ def gen_wrapper(prototype, buffer):
         #debug("param after hack: %s" % param_info)
 
     #debug("")
+    #debug( pprint.pformat( (funcnm,dict(inp=input_list,out=output_list,),) ) )
 
     # parse the outputs
     if output_list:
@@ -489,6 +488,9 @@ def gen_wrapper(prototype, buffer):
         output_list[-1].allocate_memory = input_list[-1].name
         manually_build_returnVal = True
         pass
+
+    py_to_c_conversions = [];
+    extra_inoutput_name_list = []
 
     for output in output_list:
         #print output
@@ -519,6 +521,17 @@ def gen_wrapper(prototype, buffer):
 
         buffer.write(";")
 
+        # if this output has a get_spice_fn function associated with it,
+        # and is a SpiceCell, and is an output only, then in reality it
+        # will need an input argument to define its size, so declare a
+        # variable for the conversion
+        if output.type=='SpiceCell' and output.get_spice_fn and output.param_type==OUTPUT_TYPE:
+            py_output_name = "py_%s" % output.name
+            buffer.write("\n  PyObject * %s = NULL;" % py_output_name)
+            py_to_c_conversions.append("%s = %s(%s);" % (output.name, output.get_spice_fn, py_output_name))
+            extra_inoutput_name_list.append( py_output_name )
+            extra_parse_tuple_string += output.py_string
+
         output_name_list.append(output.name)
 
     # parse the inputs
@@ -528,7 +541,6 @@ def gen_wrapper(prototype, buffer):
     # in the loop below, the variables are being declared as type
     # 'reg_type'.  this is because python was not properly parsing the
     # arguments passed in from Python when using SPICE variable types.
-    py_to_c_conversions = [];
 
     for input in input_list:
         input_name = input.name
@@ -586,7 +598,7 @@ def gen_wrapper(prototype, buffer):
           buffer.write('\n  PyObject *returnVal;')
 
     # configure the input string list for parsing the args tuple
-    input_list_string = "&" + ", &".join( input_name_list )
+    input_list_string = "&" + ", &".join( input_name_list + extra_inoutput_name_list )
 
     # if the function type is not void, declare a variable for the
     # result.
@@ -604,11 +616,11 @@ def gen_wrapper(prototype, buffer):
 
     # generate the PyArg_ParseTuple call if there were any inputs to
     # this function
-    if input_name_list:
+    if input_name_list+extra_inoutput_name_list:
         buffer.write(
             ('\n  PYSPICE_CHECK_RETURN_STATUS(' +
              'PyArg_ParseTuple(args, "%s", %s));') % \
-            (parse_tuple_string, input_list_string))
+            (parse_tuple_string+extra_parse_tuple_string, input_list_string))
 
     # if there are any Python -> C conversions that need to occur, add them here.
     if py_to_c_conversions:
@@ -734,8 +746,8 @@ def gen_wrapper(prototype, buffer):
                        (python_function_name, python_function_name, python_function_name))
 
     ### Callers only check for True or false; buffer argument is modified in place
-    ### Old:  return buffer.getvalue()
     return True
+    ### Old:  return buffer.getvalue()
 
 def get_array_sizes(list, name):
     """
