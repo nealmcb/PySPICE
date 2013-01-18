@@ -39,6 +39,14 @@ class Container(dict):
 # generate the wrappers.
 function_types = ('ConstSpiceChar', 'SpiceBoolean', 'SpiceChar', 'SpiceDouble', 'SpiceInt', 'void')
 
+### fix for output arguments mislabeled as inputs in source files
+### - Key is variable name (e.g. 'c')
+### - Value is tuple of toolkit routine names (e.g. 'whtevr_c') where that
+###   variable name should be an output but is labeled as an input
+###   in the -Brief_I/O sections of the source file
+mislabeled_outputs = dict( c=('wndifd_c','wnintd_c','wnunid_c',) )
+
+### Rename these to something else
 RESERVED_NAMES = ('free',)
 
 # Reasons for excluding the following functions
@@ -421,10 +429,16 @@ def gen_wrapper(prototype, buffer):
 
                 ioDictArgName = ioDict.defArgSequence.pop(0)
 
+                override=''
+                if ioDictArgName in mislabeled_outputs:
+                  if funcnm in mislabeled_outputs[ioDictArgName]:
+                    override = '  /* N.B. OUTPUT MISLABELED AS INPUT IN (-Brief_I/O section)\n          of %s.c HAS BEEN OVERRIDDEN: */\n' % funcnm
+                    ioDict[ioDictArgName] = 'O'
+
                 if not (param_info.name in ioDict):
                    ioDict[param_info.name] = ioDict[ioDictArgName]
 
-                buffer.write( '\n  /* %s() using param_type ioDict["%s"]=%s for %s */' % ( funcnm, ioDictArgName, ioDict[ioDictArgName], param_info.name, ) )
+                buffer.write( '\n%s  /* %s() using param_type ioDict["%s"]=%s for %s */' % ( override, funcnm, ioDictArgName, ioDict[ioDictArgName], param_info.name, ) )
 
                 t_type = IOTYPE[ioDict[param_info.name]]
 
