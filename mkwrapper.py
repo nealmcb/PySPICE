@@ -721,8 +721,10 @@ def gen_wrapper(prototype, buffer):
                     '"%s", %s);') % (output.py_string, output.name)
                 )
             elif output.name != 'found':
+                if output.is_array==1 and output.py_string=='s': sfx='#'
+                else                                           : sfx=''
                 buffer.write(
-                    '\n  strcat(buildvalue_string, "%s");' % output.py_string
+                    '\n  strcat(buildvalue_string, "%s%s");' % (output.py_string,sfx,)
                 )
 
         buffer.write('\n')
@@ -792,7 +794,6 @@ def make_automatic_returnVal(buffer, output_list):
 
     # put together the outputs
     t_list = []
-    buildvalue_string = ''
 
     # Check_found is used to indicate whether a found variable was
     # passed along with other output variables.  check_found is set to
@@ -820,7 +821,11 @@ def make_automatic_returnVal(buffer, output_list):
         # to build a python tuple out of them (This seems sub-optimal, I
         # have to read some more python C documentation).
         if output.is_array:
-            t_list += get_array_sizes(output.num_elements, output.name)
+            if output.is_array==1 and output.py_string=='s':
+                t_list.append(output.name)
+                t_list.append(str(output.num_elements[0]))
+            else:
+                t_list += get_array_sizes(output.num_elements, output.name)
         elif(output.get_py_fn):
             if(output.type=='SpiceCell'):
                 t_list.append('%s(%s)' % (output.get_py_fn, output.name))
@@ -828,8 +833,6 @@ def make_automatic_returnVal(buffer, output_list):
                 t_list.append('%s(&%s)' % (output.get_py_fn, output.name))
         else:
             t_list.append(output.name)
-
-        buildvalue_string += output.py_string
 
     output_list_string = ", ".join(t_list)
 
@@ -1048,7 +1051,7 @@ def parse_param(param):
         #debug('is_array: %s' % str(param_obj.is_array))
         #debug('py_string: %s' % param_obj.py_string)
 
-        if param_obj.is_array:
+        if param_obj.is_array and ( param_obj.is_array>1 or param_obj.py_string!='s' ):
             param_obj.py_string = get_tuple_py_string(param_obj)
 
         return param_obj
@@ -1281,7 +1284,7 @@ void init_spice(PyObject *self)
 
   /* Don't allow an exception to stop execution */
   erract_c("SET", 0, "RETURN");
-  errdev_c("SET", 0, "NULL");
+  //errdev_c("SET", 0, "NULL");
 
   SpiceException = \
     PyErr_NewException("_spice.SpiceException", PyExc_Exception, NULL);
