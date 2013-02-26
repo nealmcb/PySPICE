@@ -4,7 +4,6 @@ import os
 import sys
 import spice
 import unittest
-from matplotlib import pyplot as plt
 
 class TestHorizons(unittest.TestCase):
   def setUp(self):
@@ -87,17 +86,24 @@ kernels/spk_drm239_WithBurn-full.bsp
     Elongation, Sun-DI-%s, deg
     """.strip().split('\n')]
 
-    plt.figure(1)
-    for idx in range(len(titles)):
-      ordinate = [i[idx+2] for i in valarrs]
-      plt.subplot( 221+idx )
-      plt.plot( days, ordinate )
-      plt.plot( days, ordinate, '.')
-      plt.title( titles[idx] )
-      plt.ylabel( titles[idx] )
-      if idx>1: plt.xlabel( 'T-Tperi, d' )
+    try:
+      ### Moved matplotlib import to here so test runs to here at least
+      from matplotlib import pyplot as plt
+      plt.figure(1)
+      for idx in range(len(titles)):
+        ordinate = [i[idx+2] for i in valarrs]
+        plt.subplot( 221+idx )
+        plt.plot( days, ordinate )
+        plt.plot( days, ordinate, '.')
+        plt.title( titles[idx] )
+        plt.ylabel( titles[idx] )
+        if idx>1: plt.xlabel( 'T-Tperi, d' )
 
-    plt.show()
+      plt.show()
+
+    except:
+      print( "Bypassed, or failed, matplotlib tests" )
+
 
 
 if __name__=="__main__":
