@@ -18,6 +18,9 @@ NAIF_BODY_CODE += (  1420511                  )
 
 NAIF_BODY_NAME += ( 'SMAP_FEFLECTOR'          )
 NAIF_BODY_CODE += (  1420512                  )
+
+NAIF_BODY_NAME += ( 'EARTH_SUN_ORBIT'         )
+NAIF_BODY_CODE += (  1420599                  )
 \begintext
 
 SMAP Spacecraft bus frame:  dynamic (Class 5) two-vector TK frame
@@ -53,7 +56,7 @@ FRAME_1420500_SEC_ABCORR     = 'NONE'
 
 SMAP Reflector base frame:  static (Class 4) TK frame
 
-  Expresses instrument base alignment wrt S/C bus:  initially aligned
+  Expresses instrument base alignment wrt S/C bus:  initially coincident
 
 \begindata
  
@@ -73,7 +76,7 @@ TKFRAME_1420510_MATRIX       =  ( 1.0 0.0 0.0
 
 SMAP Reflector rotating frame:  dynamic (Class 5) Euler frame
 
-  Rotates around nominal Nadir at 14.6 rpm = 87.6 deg/s
+  Rotates around reflector base +X at 14.6 rpm = 87.6 deg/s
 
 \begindata
  
@@ -112,21 +115,40 @@ FRAME_1420512_CLASS_ID        =  1420512
 TKFRAME_1420512_RELATIVE      =  'SMAP_REFLECTOR_ROTATING'
 TKFRAME_1420512_SPEC          = 'ANGLES'
 TKFRAME_1420512_UNITS         = 'DEGREES'
-TKFRAME_1420512_ANGLES        =  ( 50.0  0.0  0.0 )
+TKFRAME_1420512_ANGLES        =  ( 40.0  0.0  0.0 )
 TKFRAME_1420512_AXES          =  ( 2     1    2   )
 
 \begintext
 
+Earth/Sun orbit frame
+
+    Primary: +Z from Earth to Sun
+  Secondary: +X near Earth Sun-relative velocity
+
 \begindata
  
-FRAME_MYEARTH_FIXED  =  399
-FRAME_399_NAME       = 'MYEARTH_FIXED'
-FRAME_399_CLASS      =  2
-FRAME_399_CLASS_ID   =  399
-FRAME_399_CENTER     =  399
- 
-OBJECT_EARTH_FRAME   = 'MYEARTH_FIXED'
-OBJECT_399_FRAME     = 'MYEARTH_FIXED'
+FRAME_EARTH_SUN_ORBIT       =  1420599
+FRAME_1420599_NAME          = 'EARTH_SUN_ORBIT'
+FRAME_1420599_CLASS         =  5
+FRAME_1420599_CENTER        =  399
+FRAME_1420599_CLASS_ID      =  1420599
+
+FRAME_1420599_RELATIVE       =  'J2000'
+FRAME_1420599_DEF_STYLE      =  'PARAMETERIZED'
+FRAME_1420599_FAMILY         =  'TWO-VECTOR'
+
+FRAME_1420599_PRI_AXIS       = '+Z'
+FRAME_1420599_PRI_VECTOR_DEF = 'OBSERVER_TARGET_POSITION'
+FRAME_1420599_PRI_OBSERVER   = 399
+FRAME_1420599_PRI_TARGET     = 10
+FRAME_1420599_PRI_ABCORR     = 'LT'
+
+FRAME_1420599_SEC_AXIS       = '+X'
+FRAME_1420599_SEC_VECTOR_DEF = 'OBSERVER_TARGET_VELOCITY'
+FRAME_1420599_SEC_OBSERVER   = 10
+FRAME_1420599_SEC_TARGET     = 399
+FRAME_1420599_SEC_FRAME      = 'J2000'
+FRAME_1420599_SEC_ABCORR     = 'LT'
  
 \begintext
 
