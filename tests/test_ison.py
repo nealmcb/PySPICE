@@ -257,5 +257,3 @@ DELTET/DELTA_AT        = ( 10,   @1972-JAN-1
 
 \begintext
 """
-kernels/naif0010.tls
-kernels/spk_drm239_WithBurn-full.bsp

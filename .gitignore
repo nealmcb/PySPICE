@@ -1,4 +1,7 @@
-spicemodule.c
+_spice.so
+spicemodule.c*
 build
 *.pyc
 cspice
+SMAP_ref_150529_180529.bsp
+makespk05
