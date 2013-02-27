@@ -15,9 +15,15 @@ class TestSMAP(unittest.TestCase):
 kernels/naif0010.tls
 kernels/smap_v00.tf
 kernels/pck00009.tpc
-kernels/SMAP_ref_150529_180529.bsp
 kernels/spk_drm239_WithBurn-full.bsp
-      """.strip().split('\n') ]
+kernels/SMAP_ref_150529_180529.bsp
+###
+### That last SMAP SPK kernel, or one like it, should be under this URL:
+###
+###   http://naif.jpl.nasa.gov/pub/naif/SMAP/kernels/spk/
+###
+###
+      """.strip().split('\n') if i[0]!='#' ]
     for kernel in self.kernels: spice.furnsh( kernel )
 
   def tearDown(self):
