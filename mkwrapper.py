@@ -839,7 +839,7 @@ def make_automatic_returnVal(buffer, output_list):
     if output_list_string:
         if check_found:
             buffer.write(
-                '\n  if(!found) {\n    return Py_None;\n  } else {\n    ')
+                '\n  if(!found) {\n    Py_INCREF(Py_None);\n    return Py_None;\n  } else {\n    ')
         else:
             buffer.write('\n  ')
 
