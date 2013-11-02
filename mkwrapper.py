@@ -45,7 +45,7 @@ function_types = ('ConstSpiceChar', 'SpiceBoolean', 'SpiceChar', 'SpiceDouble', 
 ###   variable name should be an output but is labeled as an input
 ###   in the -Brief_I/O sections of the source file
 mislabeled_outputs = dict( c=('wndifd_c','wnintd_c','wnunid_c',)
-                         , mout=('xpose_c',)
+                         , mout=('xpose_c','xpose6_c',)
                          )
 
 ### Rename these to something else
