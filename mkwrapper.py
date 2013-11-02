@@ -44,7 +44,9 @@ function_types = ('ConstSpiceChar', 'SpiceBoolean', 'SpiceChar', 'SpiceDouble', 
 ### - Value is tuple of toolkit routine names (e.g. 'whtevr_c') where that
 ###   variable name should be an output but is labeled as an input
 ###   in the -Brief_I/O sections of the source file
-mislabeled_outputs = dict( c=('wndifd_c','wnintd_c','wnunid_c',) )
+mislabeled_outputs = dict( c=('wndifd_c','wnintd_c','wnunid_c',)
+                         , mout=('xpose_c',)
+                         )
 
 ### Rename these to something else
 RESERVED_NAMES = ('free',)
