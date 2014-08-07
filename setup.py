@@ -88,6 +88,8 @@ try:
     module1 = Extension(
         '_spice',
         sources = ['pyspice.c', 'spicemodule.c'],
+        include_dirs = [os.path.join(CSPICE_SRC,'include')],
+        library_dirs = [os.path.join(CSPICE_SRC,'lib')],
         libraries = ['cspice'],
     )
 

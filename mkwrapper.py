@@ -48,6 +48,10 @@ mislabeled_outputs = dict( c=('wndifd_c','wnintd_c','wnunid_c',)
                          , mout=('xpose_c','xpose6_c',)
                          )
 
+fixparam = dict( cvals=dict( gcpool_c='SpiceChar * cvals'
+                           )
+               )
+
 ### Rename these to something else
 RESERVED_NAMES = ('free',)
 
@@ -83,7 +87,7 @@ exclude_list = (
     'ckw01_c', 'ckw02_c', 'ckw03_c', 'spk14a_c', 'spkw02_c', 'spkw03_c',
     'spkw05_c', 'spkw08_c', 'spkw09_c', 'spkw10_c', 'spkw12_c', 'spkw13_c',
 
-    'dasec_c', 'ekpsel_c', 'ekrcec_c', 'gcpool_c', 'gnpool_c',
+    'dasec_c', 'ekpsel_c', 'ekrcec_c', 'gnpool_c',
 
     'dafgh_c', 'prefix_c',
 
@@ -416,9 +420,10 @@ def gen_wrapper(prototype, buffer):
                 sys.stderr.write('Warning:  void argument in list of more than one argument from %s()\n' % (funcnm,) )
             continue
 
-        param_info = parse_param(param)
+        debug( "%s:  %s" % (funcnm,str(param),) )
+        param_info = parse_param(param,funcnm=funcnm)
         if param_info is None:
-            sys.stderr.write( "### Could not parse_param %d:  '%s'\n" % ( ordinal, str(param), ) )
+            sys.stderr.write( "### Could not parse_param:  '%s'\n" % ( str(param), ) )
             continue
         #debug("parsed %s() param: %s" % (funcnm,param_info,) )
 
@@ -945,7 +950,7 @@ def fixNameCollision(name):
     else:
         return name
 
-def parse_param(param):
+def parse_param(param,funcnm=False):
     """
     Take the given parameter and break it up into the type of
     variable, the variable name and whether it's a pointer.
@@ -1043,6 +1048,12 @@ def parse_param(param):
             name = name[0:name_bracket_pos]
 
         param_obj.name = fixNameCollision(name)
+
+        if funcnm and (name in fixparam):
+          if funcnm in fixparam[name]:
+            sys.stderr.write("Overriding %s(... %s) with (... %s)" % (funcnm,param,fixparam[name][funcnm],))
+            return parse_param( fixparam[name][funcnm])
+
         param_obj.is_array = len(param_obj.num_elements)
         determine_py_type(param_obj)
 
@@ -1058,6 +1069,8 @@ def parse_param(param):
 
         return param_obj
     except Exception, msg:
+        import traceback
+        traceback.print_exc()
         if type == 'void':
             return None
         else:
