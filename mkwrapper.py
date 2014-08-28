@@ -48,14 +48,19 @@ mislabeled_outputs = dict( c=('wndifd_c','wnintd_c','wnunid_c',)
                          , mout=('xpose_c','xpose6_c',)
                          )
 
-fixparam = dict( cvals=dict( gcpool_c='SpiceChar * cvals'
-                           )
+fixparam = dict( cvals=dict( gcpool_c='SpiceChar * cvals')
                )
 
 ### Rename these to something else
 RESERVED_NAMES = ('free',)
 
 # Reasons for excluding the following functions
+### N0065
+# edterm_c - TEMPORARY:  new function in N0065, can't handle [ ]
+# illumg_c - no .c in V0065?
+# spkw20_c - problem with cdata[]
+# utf_c - for internal use by GF system only
+###
 # bodvar_c - deprecated
 # bschoc_c, etc. - how to support const void * array
 # ckw05_c - how to support SpiceCK05Subtype
@@ -65,8 +70,14 @@ RESERVED_NAMES = ('free',)
 # dasec_c - how to handle void types in parameter list
 # dafgh_c - does function actually exist?  I found no C file ...
 # ucase_c - not needed for python
-# gfevnt_c, gffove_c, gfocce_c, gfuds_c, uddc_c, uddf_c - how to support callbacks
+# gfevnt_c, gffove_c, gfocce_c, gfudb_c, gfuds_c, uddc_c, uddf_c - how to support callbacks
 exclude_list = (
+
+    ### N0065
+    'edterm_c', 'illumg_c', 'spkw20_c'
+    , 'udf_c'
+    ,
+
     'cnames',
 
     'bodvar_c',
@@ -94,7 +105,7 @@ exclude_list = (
     'lcase_c', 'ucase_c', 'getcml_c', 'lparse_c', 'lparsm_c', 'prompt_c',
     'putcml_c', 'reordc_c', 'shellc_c', 'sumad_c', 'sumai_c',
 
-    'gfevnt_c', 'gffove_c', 'gfocce_c', 'gfuds_c', 'uddc_c', 'uddf_c',
+    'gfevnt_c', 'gffove_c', 'gfocce_c', 'gfudb_c', 'gfuds_c', 'uddc_c', 'uddf_c',
 )
 
 module_defs = []
