@@ -100,7 +100,7 @@ Index of http://naif.jpl.nasa.gov/pub/naif/toolkit/C/:
   ###   SUNOS and SUN4U => SunSPARC_Solaris
   ###
   
-  dSys1 = dict( OSX=dict( I386='MacIntel', PPC='MacPPC', sis2='OSX', zSfx='tar.Z' )
+  dSys1 = dict( OSX=dict( X86_64='MacIntel', I386='MacIntel', PPC='MacPPC', sis2='OSX', zSfx='tar.Z' )
               , LINUX=dict( I386='PC', X86_64='PC', sis2='Linux', zSfx='tar.Z' )
               , CYGWIN=dict( I386='PC', X86_64='PC', sis2='Cygwin', zSfx='tar.Z' )
               , WINDOWS=dict( I386='PC', X86_64='PC', sis2='Windows', zSfx='zip' )
