@@ -6,7 +6,7 @@ Retrieve a SPICE SPK file for the given comet or asteroid from JPL Horizons, as 
 For example, to retrieve an SPK for comet 67P:
 
 $ python horizons.py 900647
-('900647_pexpect.bsp', 1000012, ['Horizons lookup status=0, URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15', '### Retrieved SPK (URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15) as 900647_pexpect.bsp', '### Retrieved SPICEID 1000012; status=SUCCESS'])
+('900647_pexpect.xfr', 1000012, ['Horizons lookup status=0, URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15', '### Retrieved SPK (URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15) as 900647_pexpect.xfr', '### Retrieved SPICEID 1000012; status=SUCCESS'])
 """
 
 import re
