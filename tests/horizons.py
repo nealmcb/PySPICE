@@ -7,10 +7,14 @@ For example, to retrieve an SPK for comet 67P:
 
 $ python horizons.py 900647
 ('900647_pexpect.xfr', -1, ['Horizons lookup status=0, URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld24158.15', '### Retrieved SPK (URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld24158.15) as 900647_pexpect.xfr', '### Retrieved SPICEID -1; status=SUCCESS'])
-('900647_pexpect.xfr', 1000012, ['Horizons lookup status=0, URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15', '### Retrieved SPK (URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15) as 900647_pexpect.xfr', '### Retrieved SPICEID 1000012; status=SUCCESS'])
 
 Bugs:
 The returned SPICEID is -1, not the actual "Target SPK ID" from the .xfr file.
+
+It should return something like this:
+
+('900647_pexpect.xfr', 1000012, ['Horizons lookup status=0, URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15', '### Retrieved SPK (URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15) as 900647_pexpect.xfr', '### Retrieved SPICEID 1000012; status=SUCCESS'])
+
 """
 
 import re
