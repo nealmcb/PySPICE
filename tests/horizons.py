@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+"""
+Retrieve a SPICE SPK file for the given comet or asteroid from JPL Horizons, as described at
+ http://ssd.jpl.nasa.gov/?horizons_doc
+
+For example, to retrieve an SPK for comet 67P:
+
+$ python horizons.py 900647
+('900647_pexpect.bsp', 1000012, ['Horizons lookup status=0, URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15', '### Retrieved SPK (URL=ftp://ssd.jpl.nasa.gov/pub/ssd/wld11001.15) as 900647_pexpect.bsp', '### Retrieved SPICEID 1000012; status=SUCCESS'])
+"""
 
 import re
 import os
@@ -23,7 +32,7 @@ def horizons(target):
 
   if rtn == 2: return rtn,pe.before
 
-  sl( target+nl )
+  sl( target )
   rtn = ex( ['\[S]PK', pexpect.TIMEOUT], timeout=3)
   if rtn > 0: return rtn,pe.before
 
@@ -32,10 +41,19 @@ def horizons(target):
   if rtn > 0: return rtn,pe.before
 
   sl( 'pexpect@python.org'+nl )
+  rtn = ex( ['Confirm e-mail.*YES, NO,', pexpect.TIMEOUT], timeout=3)
+  if rtn > 0: return rtn,pe.before
+
+  sl( 'YES')
+
+  # It appears that this question is no longer asked.
+  """
   rtn = ex( ['text transfer.*YES, NO,', pexpect.TIMEOUT], timeout=3)
   if rtn > 0: return rtn,pe.before
 
   sl( 'NO' )
+  """
+
   rtn = ex( ['START', pexpect.TIMEOUT], timeout=3)
   if rtn > 0: return rtn,pe.before
 
@@ -79,7 +97,7 @@ def brief(fn):
   return int(pe.before),'SUCCESS'
   
 def gomain(target):
-  fn = '_'.join( re.split('[^-a-zA-Z0-9]',target) )+'_pexpect.bsp'
+  fn = '_'.join( re.split('[^-a-zA-Z0-9]',target) )+'_pexpect.xfr'
   spiceId = 0
   msgs = ['Horizons lookup FAILED'
          ,'SPK retrieval not attempted'
@@ -96,10 +114,15 @@ def gomain(target):
       msgs[0] = 'Horizons lookup status=%d, URL=%s' % (r,url,)
 
       msgs[1] = 'SPK retrieval FAILED'
-      msgs[1] = '### Retrieved SPK (URL=%s) as %s' % (url, urllib.urlretrieve(url,fn)[0],)
+      urlret = urllib.urlretrieve(url,fn)
+      msgs[1] = '### Retrieved SPK (URL=%s) as %s' % (url, urlret[0])
 
       msgs[2] = 'SPICE Body ID FAILED'
-      spiceId,status = brief(fn)
+      # spiceId,status = brief(fn)
+      # Horizons seems to now retrieve ASCII files rather than binary BSP files, and brief doesn't work on those.
+      # For now just assume success, and pretend it is really a BSP file, and return 'NA' rather than the actual SPICEID.
+      # We could just use a regular expression to search for this sort of text:  Target SPK ID   :  1000012
+      spiceId,status = (-1, 'SUCCESS')
       msgs[2] = '### Retrieved SPICEID %d; status=%s' % (spiceId,status,)
 
   except:
